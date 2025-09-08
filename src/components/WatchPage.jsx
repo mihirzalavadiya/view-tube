@@ -95,7 +95,7 @@ const WatchPage = () => {
   const { snippet, statistics, contentDetails } = videoData;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen mt-14 sm:mt-18">
       {/* Video Player Container */}
       <div className="w-full">
         <div className="relative w-full aspect-video">

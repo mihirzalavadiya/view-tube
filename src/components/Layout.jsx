@@ -16,7 +16,7 @@ const Layout = ({ children }) => {
         {/* Sidebar */}
         <div
           className={`transition-all duration-300 ease-in-out ${
-            sidebarOpen ? 'w-64' : 'w-16'
+            sidebarOpen ? 'w-16 lg:w-64' : 'w-16'
           }`}
         >
           <Sidebar />

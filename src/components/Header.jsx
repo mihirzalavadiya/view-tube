@@ -19,6 +19,8 @@ import {
 } from '@/redux/slice/videoListSlice';
 import Link from 'next/link';
 import useVideos from '@/hooks/useVideos';
+import useSearchSuggestions from '@/hooks/useSearchSuggestions';
+import useSearchVideos from '@/hooks/useSearchVideos';
 
 const Header = () => {
   const dispatch = useDispatch();
@@ -28,7 +30,6 @@ const Header = () => {
   const suggestionsRef = useRef(null);
 
   const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -45,33 +46,16 @@ const Header = () => {
     'cooking recipes',
   ];
 
-  useEffect(() => {
-    const fetchSuggestions = async () => {
-      if (!query.trim()) {
-        setSuggestions([]);
-        return;
-      }
+  const { suggestions } = useSearchSuggestions(query);
+  const { searchVideos } = useSearchVideos();
 
-      try {
-        const res = await fetch(`/api/search?q=${query}`);
-        const data = await res.json();
-        setSuggestions(data[1] || []);
-      } catch (error) {
-        console.error('Error fetching suggestions:', error);
-        // Mock suggestions for demo
-        setSuggestions([
-          { snippet: { title: `${query} tutorial` } },
-          { snippet: { title: `${query} guide` } },
-          { snippet: { title: `${query} tips` } },
-          { snippet: { title: `${query} 2024` } },
-          { snippet: { title: `best ${query}` } },
-        ]);
-      }
-    };
-
-    const delay = setTimeout(fetchSuggestions, 300);
-    return () => clearTimeout(delay);
-  }, [query]);
+  const handleSearch = async (searchQuery = query) => {
+    if (!searchQuery.trim()) return;
+    const videos = await searchVideos(searchQuery);
+    dispatch(addVideos(videos));
+    setShowSuggestions(false);
+    setIsSearchFocused(false);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -89,22 +73,6 @@ const Header = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const handleSearch = async (searchQuery = query) => {
-    if (!searchQuery.trim()) return;
-
-    try {
-      const res = await fetch(`/api/searchvideo?q=${searchQuery}`);
-      if (!res.ok) throw new Error('Failed to fetch search results');
-
-      const data = await res.json();
-      dispatch(addVideos(data.items || []));
-      setShowSuggestions(false);
-      setIsSearchFocused(false);
-    } catch (error) {
-      console.error('Error fetching search results:', error);
-    }
-  };
 
   const handleSuggestionClick = (suggestion) => {
     const searchText = suggestion.snippet?.title || suggestion;
