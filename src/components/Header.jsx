@@ -94,7 +94,9 @@ const Header = () => {
         {/* Left: Menu + Logo */}
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           <button
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+            className={`p-2 ${
+              darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+            }  rounded-full transition-colors`}
             onClick={() => dispatch(toggleSidebar())}
           >
             <FiMenu size={20} />
@@ -154,7 +156,9 @@ const Header = () => {
             {query && (
               <button
                 onClick={clearSearch}
-                className="absolute right-12 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                className={`absolute right-12 p-1 ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                } rounded-full transition-colors`}
               >
                 <FiX size={16} className="text-gray-500" />
               </button>
@@ -163,7 +167,9 @@ const Header = () => {
             {/* Search Button */}
             <button
               onClick={() => handleSearch()}
-              className={`absolute right-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors ${
+              className={`absolute right-2 p-2 ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              } rounded-full transition-colors ${
                 query ? 'text-red-600' : 'text-gray-500'
               }`}
             >
@@ -192,7 +198,9 @@ const Header = () => {
                     <button
                       key={index}
                       onClick={() => handleSuggestionClick(search)}
-                      className={`w-full flex items-center px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors rounded ${
+                      className={`w-full flex items-center px-3 py-2 text-left ${
+                        darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                      } transition-colors rounded ${
                         darkMode ? 'text-white' : 'text-gray-900'
                       }`}
                     >
@@ -206,7 +214,9 @@ const Header = () => {
                           e.stopPropagation();
                           // Remove from recent searches logic
                         }}
-                        className="ml-auto p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        className={`ml-auto p-1 ${
+                          darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                        } rounded opacity-0 group-hover:opacity-100 transition-opacity`}
                       >
                         <FiX size={12} className="text-gray-500" />
                       </span>
@@ -217,7 +227,11 @@ const Header = () => {
 
               {/* Trending Searches (when no query) */}
               {!query && trendingSearches.length > 0 && (
-                <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                <div
+                  className={`p-2 border-t ${
+                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                  }`}
+                >
                   <div className="flex items-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     <FiTrendingUp size={14} className="mr-2" />
                     Trending
@@ -226,7 +240,9 @@ const Header = () => {
                     <button
                       key={index}
                       onClick={() => handleSuggestionClick(search)}
-                      className={`w-full flex items-center px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors rounded ${
+                      className={`w-full flex items-center px-3 py-2 text-left ${
+                        darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                      } transition-colors rounded ${
                         darkMode ? 'text-white' : 'text-gray-900'
                       }`}
                     >
@@ -251,7 +267,9 @@ const Header = () => {
                     <button
                       key={index}
                       onClick={() => handleSuggestionClick(suggestion)}
-                      className={`w-full flex items-center px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors rounded group ${
+                      className={`w-full flex items-center px-3 py-2 text-left ${
+                        darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                      } transition-colors rounded group ${
                         darkMode ? 'text-white' : 'text-gray-900'
                       }`}
                     >
@@ -283,14 +301,24 @@ const Header = () => {
 
         {/* Right: Icons */}
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors hidden sm:block">
+          <button
+            className={`p-2 ${
+              darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+            } rounded-full transition-colors hidden sm:block`}
+          >
             <FiUpload size={18} />
           </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
+          <button
+            className={`p-2 ${
+              darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+            } rounded-full transition-colors`}
+          >
             <FiBell size={18} />
           </button>
           <button
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+            className={`p-2 ${
+              darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
+            } rounded-full transition-colors`}
             onClick={() => dispatch(toggleDarkMode())}
           >
             {darkMode ? <FiSun size={18} /> : <FiMoon size={18} />}
