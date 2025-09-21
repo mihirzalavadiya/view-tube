@@ -1,38 +1,14 @@
 import { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
+import CommentsSection from './CommentsSection';
+import useYouTubeVideo from '@/hooks/useYouTubeVideo';
 
 const WatchPage = () => {
   const router = useRouter();
   const { v } = router.query;
-  const [videoData, setVideoData] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  const { videoData, loading, error } = useYouTubeVideo(v);
   const [showDescription, setShowDescription] = useState(false);
-
-  useEffect(() => {
-    if (v) {
-      getVideos();
-    }
-  }, [v]);
-
-  const getVideos = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`/api/viewtubevideo?id=${v}`);
-
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        setVideoData(data.items[0]);
-      }
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Format view count
   const formatViewCount = (count) => {
@@ -253,6 +229,10 @@ const WatchPage = () => {
               {showDescription ? 'Show less' : 'Show more'}
             </button>
           )}
+        </div>
+
+        <div className="bg-gray-800 rounded-xl mt-3 p-3 md:p-4">
+          <CommentsSection videoId={v} isDarkMode={false} />
         </div>
       </div>
     </div>
