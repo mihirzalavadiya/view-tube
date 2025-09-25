@@ -67,8 +67,8 @@ const Sidebar = ({ onClose }) => {
 
   return (
     <aside
-      className={`fixed left-0 top-16 h-[calc(100vh-4rem)] overflow-y-auto z-40 transition-all duration-300 ${
-        sidebarOpen ? 'w-64' : 'w-16'
+      className={`fixed left-0 top-16 no-scrollbar h-[calc(100vh-4rem)] overflow-y-auto z-40 transition-all duration-300 ${
+        sidebarOpen ? 'w-55' : 'w-16'
       } ${
         darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-800'
       } shadow-lg border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}

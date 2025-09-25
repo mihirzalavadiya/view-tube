@@ -2,13 +2,21 @@ import { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
 import CommentsSection from './CommentsSection';
 import useYouTubeVideo from '@/hooks/useYouTubeVideo';
+import LiveChat from './LiveChat';
+import { useSelector } from 'react-redux';
 
 const WatchPage = () => {
   const router = useRouter();
   const { v } = router.query;
 
+  const [newMessage, setNewMessage] = useState('');
   const { videoData, loading, error } = useYouTubeVideo(v);
   const [showDescription, setShowDescription] = useState(false);
+  const messages = useSelector((store) => store.livechat.messages);
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+  };
 
   // Format view count
   const formatViewCount = (count) => {
@@ -73,18 +81,67 @@ const WatchPage = () => {
   return (
     <div className="min-h-screen mt-14 sm:mt-18">
       {/* Video Player Container */}
-      <div className="w-full">
-        <div className="relative w-full aspect-video">
-          <iframe
-            className="w-full h-full rounded-md"
-            src={`https://www.youtube.com/embed/${v}?autoplay=1&mute=0&cc_load_policy=1&cc_lang_pref=en`}
-            title={snippet.title}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
-          ></iframe>
+      <div className="w-full flex gap-4 flex-wrap">
+        {/* Left Side: Video */}
+        <div className="flex-1">
+          <div className="relative w-full aspect-video">
+            <iframe
+              className="w-full h-full rounded-md"
+              src={`https://www.youtube.com/embed/${v}?autoplay=1&mute=0&cc_load_policy=1&cc_lang_pref=en`}
+              title={snippet.title}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            ></iframe>
+          </div>
         </div>
+
+        {/* Right Side: Live Chat */}
+        {messages?.length > 0 && (
+          <div className="w-full lg:w-80 bg-gray-800 rounded-md p-4 text-white h-96 xl:h-150 flex flex-col">
+            <h3 className="font-semibold mb-2">Live Chat</h3>
+            <div className=" overflow-y-auto no-scrollbar">
+              <LiveChat />
+            </div>
+            <div className="pt-3 border-t border-gray-700">
+              <form onSubmit={handleSendMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Say something..."
+                  className="flex-1 bg-gray-700 text-white placeholder-gray-400 px-3 py-2 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  maxLength={200}
+                />
+                <button
+                  type="submit"
+                  disabled={!newMessage.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white p-2 rounded-full transition-colors"
+                >
+                  <svg
+                    className="w-5 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                    ></path>
+                  </svg>
+                </button>
+              </form>
+
+              {/* Character Count */}
+              <div className="text-xs text-gray-500 mt-1 text-right">
+                {newMessage.length}/200
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Video Info Container */}

@@ -16,7 +16,7 @@ const Layout = ({ children }) => {
         {/* Sidebar */}
         <div
           className={`transition-all duration-300 ease-in-out ${
-            sidebarOpen ? 'w-16 lg:w-64' : 'w-16'
+            sidebarOpen ? 'w-16 lg:w-55' : 'w-16'
           }`}
         >
           <Sidebar />
@@ -25,7 +25,7 @@ const Layout = ({ children }) => {
         {/* Main Content */}
         <main
           className={`flex-1 p-4 sm:p-4 w-full transition-all duration-300 ease-in-out ${
-            sidebarOpen ? 'ml-0' : 'ml-0'
+            sidebarOpen ? 'pl-20 sm:pl-4 ml-0' : 'ml-0 pl-20 sm:pl-4'
           } ${darkMode ? 'text-white' : ' text-gray-800'}`}
         >
           {children}
