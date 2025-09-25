@@ -7,6 +7,7 @@ const liveChatSlice = createSlice({
   },
   reducers: {
     addMessage: (state, action) => {
+      state.messages.splice(30, 1);
       const newMessages = Array.isArray(action.payload)
         ? action.payload
         : [action?.payload];

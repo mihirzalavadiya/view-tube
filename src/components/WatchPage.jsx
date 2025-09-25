@@ -3,10 +3,12 @@ import React, { useEffect, useState } from 'react';
 import CommentsSection from './CommentsSection';
 import useYouTubeVideo from '@/hooks/useYouTubeVideo';
 import LiveChat from './LiveChat';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { addMessage } from '@/redux/slice/liveChatSlice';
 
 const WatchPage = () => {
   const router = useRouter();
+  const dispatch = useDispatch();
   const { v } = router.query;
 
   const [newMessage, setNewMessage] = useState('');
@@ -14,8 +16,79 @@ const WatchPage = () => {
   const [showDescription, setShowDescription] = useState(false);
   const messages = useSelector((store) => store.livechat.messages);
 
+  const videoId = v || 'wKX4SSDc1ZA'; // fallback
+
+  useEffect(() => {
+    const fetchLiveChat = async () => {
+      try {
+        const res = await fetch(`/api/livechat?videoId=${videoId}`);
+        const data = await res.json();
+        console.log(data);
+        if (Array.isArray(data?.items)) {
+          data.items.forEach((item) => {
+            const authorDetails = item?.authorDetails;
+            const snippet = item?.snippet;
+
+            const avatar = authorDetails?.profileImageUrl;
+            const username = authorDetails?.displayName;
+            const message =
+              snippet?.displayMessage ||
+              snippet?.textMessageDetails?.messageText;
+            const timestamp = new Date(snippet?.publishedAt);
+            const isOwner = authorDetails?.isChatOwner;
+            const isModerator = authorDetails?.isChatModerator;
+            const isSponsor = authorDetails?.isChatSponsor;
+            const isVerified = authorDetails?.isVerified;
+
+            dispatch(
+              addMessage({
+                id: item.id,
+                avatar,
+                username,
+                message,
+                timestamp,
+                isOwner,
+                isModerator,
+                isSponsor,
+                isVerified,
+              })
+            );
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching live chat:', error);
+      }
+    };
+
+    fetchLiveChat();
+    const interval = setInterval(() => {
+      fetchLiveChat();
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [videoId, dispatch]);
+
   const handleSendMessage = (e) => {
     e.preventDefault();
+
+    if (!newMessage.trim()) return;
+
+    dispatch(
+      addMessage({
+        id: Date.now(),
+        avatar: '',
+        username: 'You',
+        message: newMessage.trim(),
+        timestamp: new Date().toISOString(),
+        isOwner: false,
+        isModerator: false,
+        isSponsor: false,
+        isVerified: false,
+      })
+    );
+
+    // Input clear kar do
+    setNewMessage('');
   };
 
   // Format view count
