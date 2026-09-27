@@ -1,89 +1,204 @@
-@import url('https://fonts.googleapis.com/css2?family=Zain:ital,wght@0,200;0,300;0,400;0,700;0,800;0,900;1,300;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&family=Hanken+Grotesque:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import 'tailwindcss';
 
+/* ── Design tokens ─────────────────────────────────────────────
+   Dark is the default. Light is opted into with data-vt="light"
+   on <html>, set before paint by the script in _document.js. */
 :root {
-  --background: #ffffff;
-  --text: #100f0f;
-  --red: #dc2626;
-  --border: #d1d5db;
-  --active-text: #ffffff;
-  --shadow: rgba(0, 0, 0, 0.1);
+  --bg: #0b0c0e;
+  --surface: #14161a;
+  --surface2: #1c1f25;
+  --surface3: #23272e;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --ink: #f4f5f3;
+  --ink-2: #c3c7cc;
+  --muted: #8e949b;
+  --accent: #c6f24e;
+  --accent-ink: #10130f;
+  --accent-soft: rgba(198, 242, 78, 0.14);
+  --accent-text: #c6f24e;
+  --shadow: 0 18px 50px -24px rgba(0, 0, 0, 0.9);
+}
 
-  :where(.dark) {
-    --background: #100f0f;
-    --text: #ffffff;
-    --red: #dc3636;
-    --border: #8d8686e6;
-    --active-text: #ffffff;
-    --shadow: rgba(255, 255, 255, 0.08);
-  }
+:root[data-vt='light'] {
+  --bg: #f4f2ec;
+  --surface: #ffffff;
+  --surface2: #ebe8e0;
+  --surface3: #e2ded4;
+  --line: rgba(16, 19, 15, 0.12);
+  --line-strong: rgba(16, 19, 15, 0.24);
+  --ink: #14161a;
+  --ink-2: #3b4048;
+  --muted: #6b7078;
+  --accent: #c6f24e;
+  --accent-ink: #10130f;
+  --accent-soft: rgba(150, 196, 30, 0.22);
+  /* accent at full chroma fails contrast on paper, so text-only
+     accent darkens in light mode while fills stay lime */
+  --accent-text: #4e6b0e;
+  --shadow: 0 18px 44px -28px rgba(20, 22, 26, 0.45);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-color: var(--text);
-  --color-red: var(--red);
-  --color-border: var(--border);
-  --color-active-text: var(--active-text);
-  --color-shadow-color: var(--shadow);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-surface3: var(--surface3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+
+  --font-display: 'Bricolage Grotesque', sans-serif;
+  --font-sans: 'Hanken Grotesque', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-card: 18px;
+  --radius-panel: 22px;
+  --radius-hero: 24px;
+
+  --shadow-raised: var(--shadow);
 }
 
+/* These must live in @layer base. Unlayered rules outrank everything in
+   Tailwind's utilities layer regardless of specificity, so an unlayered
+   `a { color }` would beat text-* utilities on every Link in the app. */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  body {
+    font-family: 'Hanken Grotesque', system-ui, sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Focus ring on everything interactive */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 20px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@keyframes vtRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vtPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.vt-rise {
+  animation: vtRise 0.35s ease both;
+}
+
+.vt-pulse {
+  animation: vtPulse 1.4s ease-in-out infinite;
+}
+
+.no-scrollbar::-webkit-scrollbar,
 .scrollbar-hide::-webkit-scrollbar {
-  display: none; /* Chrome, Safari and Opera */
-}
-
-body {
-  font-family: 'Zain', sans-serif;
-}
-
-.zain-extralight {
-  font-family: 'Zain', sans-serif;
-  font-weight: 200;
-  font-style: normal;
-}
-
-.zain-light {
-  font-family: 'Zain', sans-serif;
-  font-weight: 300;
-  font-style: normal;
-}
-
-.zain-regular {
-  font-family: 'Zain', sans-serif;
-  font-weight: 400;
-  font-style: normal;
-}
-
-.zain-bold {
-  font-family: 'Zain', sans-serif;
-  font-weight: 700;
-  font-style: normal;
-}
-
-.zain-extrabold {
-  font-family: 'Zain', sans-serif;
-  font-weight: 800;
-  font-style: normal;
-}
-
-.zain-black {
-  font-family: 'Zain', sans-serif;
-  font-weight: 900;
-  font-style: normal;
-}
-
-.zain-light-italic {
-  font-family: 'Zain', sans-serif;
-  font-weight: 300;
-  font-style: italic;
-}
-
-.zain-regular-italic {
-  font-family: 'Zain', sans-serif;
-  font-weight: 400;
-  font-style: italic;
-}
-
-.no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.no-scrollbar,
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Design calls for balanced/pretty wrapping on titles and copy */
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vt-rise,
+  .vt-pulse {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+
+  /* hover lifts are decorative — drop them entirely */
+  .vt-lift:hover,
+  .vt-lift-lg:hover {
+    transform: none !important;
+  }
+}
+
+.vt-lift {
+  transition: transform 0.18s, border-color 0.18s, background 0.18s;
+}
+
+.vt-lift:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+}
+
+.vt-lift-lg {
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.vt-lift-lg:hover {
+  transform: translateY(-4px);
 }

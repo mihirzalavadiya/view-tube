@@ -1,371 +1,292 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React, { useEffect, useState } from 'react';
-import CommentsSection from './CommentsSection';
+import { FiArrowLeft, FiBookmark, FiHeart, FiShare2 } from 'react-icons/fi';
+import VideoPlayer from './VideoPlayer';
+import UpNext from './UpNext';
+import WatchTabs from './WatchTabs';
+import { CommentsPanel } from './CommentsSection';
+import LiveChatPanel from './LiveChatPanel';
+import ChannelAvatar from './ChannelAvatar';
 import useYouTubeVideo from '@/hooks/useYouTubeVideo';
-import LiveChat from './LiveChat';
-import { useDispatch, useSelector } from 'react-redux';
-import { addMessage } from '@/redux/slice/liveChatSlice';
+import useYouTubePlayer from '@/hooks/useYouTubePlayer';
+import useYouTubeComments from '@/hooks/useYouTubeComments';
+import useWatchHistory from '@/hooks/useWatchHistory';
+import useWatchBudget from '@/hooks/useWatchBudget';
+import useSponsorSegments from '@/hooks/useSponsorSegments';
+import useVideoNotes from '@/hooks/useVideoNotes';
+import useChannel from '@/hooks/useChannel';
+import useLocalSet from '@/hooks/useLocalSet';
+import useVideos from '@/hooks/useVideos';
+import { bestThumbnail, formatCompact, formatTimeAgo, videoIdOf } from '@/utils/format';
+import { buildDigest, buildKeyMoments } from '@/utils/comments';
 
 const WatchPage = () => {
   const router = useRouter();
-  const dispatch = useDispatch();
-  const { v } = router.query;
+  const { v: videoId } = router.query;
 
-  const [newMessage, setNewMessage] = useState('');
-  const { videoData, loading, error } = useYouTubeVideo(v);
-  const [showDescription, setShowDescription] = useState(false);
-  const messages = useSelector((store) => store.livechat.messages);
+  const { videoData, loading, error } = useYouTubeVideo(videoId);
+  const { videos } = useVideos();
+  const comments = useYouTubeComments(videoId);
+  const { recordProgress } = useWatchHistory();
+  const budget = useWatchBudget();
+  const segments = useSponsorSegments(videoId);
+  const notes = useVideoNotes(videoId);
 
-  const videoId = v || 'wKX4SSDc1ZA'; // fallback
+  const subscriptions = useLocalSet('vt-subscriptions');
+  const saved = useLocalSet('vt-saved');
+  const liked = useLocalSet('vt-liked');
+  const prefs = useLocalSet('vt-prefs');
+
+  const [shareNote, setShareNote] = useState('');
+
+  const snippet = videoData?.snippet;
+  const statistics = videoData?.statistics;
+  const channel = useChannel(snippet?.channelId);
+
+  const upNext = useMemo(
+    () => (videos || []).filter((item) => videoIdOf(item) !== videoId),
+    [videos, videoId]
+  );
+
+  const autoplay = prefs.has('autoplay');
+  const autoplayRef = useRef(autoplay);
+  autoplayRef.current = autoplay;
+  const upNextRef = useRef(upNext);
+  upNextRef.current = upNext;
+  const budgetSpentRef = useRef(budget.spent);
+  budgetSpentRef.current = budget.spent;
+
+  // "After that the feed goes quiet instead of autoplaying" — the budget is
+  // the one thing that overrides the autoplay toggle.
+  const handleEnded = useCallback(() => {
+    if (!autoplayRef.current || budgetSpentRef.current) return;
+    const next = videoIdOf(upNextRef.current[0]);
+    if (next) router.push(`/watch?v=${next}`);
+  }, [router]);
+
+  const metaRef = useRef(null);
+  metaRef.current = snippet
+    ? {
+        id: videoId,
+        title: snippet.title,
+        channel: snippet.channelTitle,
+        channelId: snippet.channelId,
+        thumbnail: bestThumbnail(videoData),
+      }
+    : null;
+
+  const playingRef = useRef(false);
+
+  const handleProgress = useCallback(
+    ({ positionSec, durationSec }) => {
+      budget.record(positionSec, playingRef.current);
+      if (!metaRef.current || !durationSec) return;
+      recordProgress({ ...metaRef.current, positionSec, durationSec });
+    },
+    [recordProgress, budget]
+  );
+
+  const player = useYouTubePlayer(videoId, {
+    onProgress: handleProgress,
+    onEnded: handleEnded,
+  });
+  playingRef.current = player.playing;
 
   useEffect(() => {
-    const fetchLiveChat = async () => {
-      try {
-        const res = await fetch(`/api/livechat?videoId=${videoId}`);
-        const data = await res.json();
-        console.log(data);
-        if (Array.isArray(data?.items)) {
-          data.items.forEach((item) => {
-            const authorDetails = item?.authorDetails;
-            const snippet = item?.snippet;
+    budget.resetPosition();
+  }, [videoId, budget]);
 
-            const avatar = authorDetails?.profileImageUrl;
-            const username = authorDetails?.displayName;
-            const message =
-              snippet?.displayMessage ||
-              snippet?.textMessageDetails?.messageText;
-            const timestamp = new Date(snippet?.publishedAt);
-            const isOwner = authorDetails?.isChatOwner;
-            const isModerator = authorDetails?.isChatModerator;
-            const isSponsor = authorDetails?.isChatSponsor;
-            const isVerified = authorDetails?.isVerified;
+  const keyMoments = useMemo(
+    () => buildKeyMoments(snippet?.description, comments.allComments, player.duration),
+    [snippet?.description, comments.allComments, player.duration]
+  );
 
-            dispatch(
-              addMessage({
-                id: item.id,
-                avatar,
-                username,
-                message,
-                timestamp,
-                isOwner,
-                isModerator,
-                isSponsor,
-                isVerified,
-              })
-            );
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching live chat:', error);
+  const digest = useMemo(
+    () => buildDigest(comments.allComments, snippet?.channelId),
+    [comments.allComments, snippet?.channelId]
+  );
+
+  const handleShare = useCallback(async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: snippet?.title, url });
+        return;
       }
-    };
-
-    fetchLiveChat();
-    const interval = setInterval(() => {
-      fetchLiveChat();
-    }, 20000);
-
-    return () => clearInterval(interval);
-  }, [videoId, dispatch]);
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-
-    if (!newMessage.trim()) return;
-
-    dispatch(
-      addMessage({
-        id: Date.now(),
-        avatar: '',
-        username: 'You',
-        message: newMessage.trim(),
-        timestamp: new Date().toISOString(),
-        isOwner: false,
-        isModerator: false,
-        isSponsor: false,
-        isVerified: false,
-      })
-    );
-
-    // Input clear kar do
-    setNewMessage('');
-  };
-
-  // Format view count
-  const formatViewCount = (count) => {
-    if (!count) return '0';
-    const num = parseInt(count);
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
+      await navigator.clipboard.writeText(url);
+      setShareNote('Link copied');
+    } catch (e) {
+      // dismissed, or clipboard blocked
     }
-    return num.toString();
-  };
+  }, [snippet?.title]);
 
-  // Format date
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 1) return 'Today';
-    if (diffDays === 1) return '1 day ago';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
-  };
-
-  // Format duration
-  const formatDuration = (duration) => {
-    const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
-    const hours = (match[1] || '').replace('H', '');
-    const minutes = (match[2] || '').replace('M', '');
-    const seconds = (match[3] || '').replace('S', '');
-
-    let formatted = '';
-    if (hours) formatted += hours + ':';
-    formatted += (minutes || '0').padStart(2, '0') + ':';
-    formatted += (seconds || '0').padStart(2, '0');
-
-    return formatted;
-  };
+  useEffect(() => {
+    if (!shareNote) return undefined;
+    const t = setTimeout(() => setShareNote(''), 2000);
+    return () => clearTimeout(t);
+  }, [shareNote]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-      </div>
-    );
-  }
-
-  if (!videoData) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <p className="text-white">Video not found</p>
-      </div>
-    );
-  }
-
-  const { snippet, statistics, contentDetails } = videoData;
-
-  return (
-    <div className="min-h-screen mt-14 sm:mt-18">
-      {/* Video Player Container */}
-      <div className="w-full flex gap-4 flex-wrap">
-        {/* Left Side: Video */}
-        <div className="flex-1">
-          <div className="relative w-full aspect-video">
-            <iframe
-              className="w-full h-full rounded-md"
-              src={`https://www.youtube.com/embed/${v}?autoplay=1&mute=0&cc_load_policy=1&cc_lang_pref=en`}
-              title={snippet.title}
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-            ></iframe>
+      <main className="px-[18px] pb-[70px] pt-[26px] md:px-[34px]">
+        <div className="vt-pulse grid gap-[30px] lg:grid-cols-[minmax(0,1fr)_372px]">
+          <div>
+            <div className="aspect-video rounded-[22px] bg-surface2" />
+            <div className="mt-6 h-8 w-3/4 rounded bg-surface2" />
+            <div className="mt-4 h-14 rounded bg-surface2" />
+          </div>
+          <div className="hidden gap-3 lg:flex lg:flex-col">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-20 rounded-[14px] bg-surface2" />
+            ))}
           </div>
         </div>
+      </main>
+    );
+  }
 
-        {/* Right Side: Live Chat */}
-        {messages?.length > 0 && (
-          <div className="w-full lg:w-80 bg-gray-800 rounded-md p-4 text-white h-96 xl:h-150 flex flex-col">
-            <h3 className="font-semibold mb-2">Live Chat</h3>
-            <div className=" overflow-y-auto no-scrollbar">
-              <LiveChat />
-            </div>
-            <div className="pt-3 border-t border-gray-700">
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Say something..."
-                  className="flex-1 bg-gray-700 text-white placeholder-gray-400 px-3 py-2 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  maxLength={200}
-                />
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white p-2 rounded-full transition-colors"
-                >
-                  <svg
-                    className="w-5 h-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                    ></path>
-                  </svg>
-                </button>
-              </form>
+  if (error || !videoData) {
+    return (
+      <main className="mx-auto flex max-w-[420px] flex-col items-center gap-3 px-[18px] py-24 text-center">
+        <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-muted">
+          Not found
+        </div>
+        <h1 className="font-display text-[20px] font-bold text-ink">
+          This video isn&rsquo;t available
+        </h1>
+        <p className="text-sm text-muted">
+          {error || 'It may have been removed or made private.'}
+        </p>
+        <Link
+          href="/"
+          className="mt-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-bold text-accent-ink"
+        >
+          Back to feed
+        </Link>
+      </main>
+    );
+  }
 
-              {/* Character Count */}
-              <div className="text-xs text-gray-500 mt-1 text-right">
-                {newMessage.length}/200
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+  const isSubscribed = subscriptions.has(snippet.channelId);
+  const isSaved = saved.has(videoId);
+  const isLiked = liked.has(videoId);
+  const topics = (snippet.tags || []).slice(0, 6);
+  const isLive = snippet.liveBroadcastContent === 'live';
 
-      {/* Video Info Container */}
-      <div className="px-4 py-4 md:px-6 lg:px-8 max-w-[1280px] mx-auto">
-        {/* Title */}
-        <h1 className="text-lg md:text-xl font-semibold leading-tight mb-3">
+  const subscriberCount = channel?.statistics?.hiddenSubscriberCount
+    ? null
+    : channel?.statistics?.subscriberCount;
+  const videoCount = channel?.statistics?.videoCount;
+  const channelMeta = [
+    subscriberCount ? `${formatCompact(subscriberCount)} subscribers` : null,
+    videoCount ? `${formatCompact(videoCount)} videos` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const pill =
+    'flex items-center gap-[7px] rounded-full bg-surface2 px-[15px] py-2.5 text-[13px] font-semibold text-ink transition-colors duration-200 hover:bg-surface3';
+
+  return (
+    <main className="vt-rise grid gap-[30px] px-[18px] pb-[70px] pt-[26px] md:px-[34px] lg:grid-cols-[minmax(0,1fr)_372px]">
+      <div className="min-w-0">
+        <Link
+          href="/"
+          className="mb-3.5 inline-flex items-center gap-2 text-[12.5px] font-semibold text-muted hover:text-accent-text"
+        >
+          <FiArrowLeft size={14} aria-hidden="true" />
+          Back to feed
+        </Link>
+
+        <VideoPlayer player={player} title={snippet.title} segments={segments} />
+
+        <h1 className="mb-3.5 mt-[22px] font-display text-[27px] font-bold leading-[1.06] tracking-[-0.035em] text-ink text-balance md:text-[33px]">
           {snippet.title}
         </h1>
 
-        {/* Channel Info and Stats */}
-        <div className="flex flex-col space-y-4 mb-4">
-          {/* Channel Info */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center">
-                <span className="text-white font-semibold">
-                  {snippet.channelTitle.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <h3 className="font-medium">{snippet.channelTitle}</h3>
-                <p className="text-gray-400 text-sm">1.2M subscribers</p>
-              </div>
+        <div className="flex flex-wrap items-center gap-3 border-b border-line pb-5">
+          <div className="flex items-center gap-[11px]">
+            <ChannelAvatar
+              src={
+                channel?.snippet?.thumbnails?.medium?.url ||
+                channel?.snippet?.thumbnails?.default?.url
+              }
+              name={snippet.channelTitle}
+              size={44}
+              radius="rounded-[13px]"
+            />
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-bold text-ink">{snippet.channelTitle}</div>
+              {channelMeta && <div className="text-xs text-muted">{channelMeta}</div>}
             </div>
-            <button className="bg-white shadow-lg text-black px-4 py-2 rounded-full font-medium hover:bg-red hover:text-white transition-colors">
-              Subscribe
-            </button>
           </div>
 
-          {/* Like/Dislike and Share Buttons */}
-          <div className="flex items-center space-x-2 overflow-x-auto scrollbar-hide">
-            <div className="flex items-center bg-gray-800 rounded-full">
-              <button className="flex items-center space-x-2 px-4 py-2 hover:bg-gray-700 rounded-l-full transition-colors">
-                <svg
-                  className="w-5 h-5 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                  ></path>
-                </svg>
-                <span className="text-white text-sm">
-                  {formatViewCount(statistics.likeCount)}
-                </span>
-              </button>
-              <div className="w-px h-6 bg-gray-600"></div>
-              <button className="px-4 py-2 hover:bg-gray-700 rounded-r-full transition-colors">
-                <svg
-                  className="w-5 h-5 text-white rotate-180"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                  ></path>
-                </svg>
-              </button>
-            </div>
-
-            <button className="flex items-center space-x-2 px-4 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors">
-              <svg
-                className="w-5 h-5 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m9.032 4.026a9.001 9.001 0 01-7.432 3.944A9 9 0 019 21a9 9 0 01-5.432-14.028A9.001 9.001 0 0112.001 3c2.618 0 4.983 1.12 6.716 2.972m-9.032 4.026A3 3 0 0115 12c0 .482-.114.938-.316 1.342"
-                ></path>
-              </svg>
-              <span className="text-white text-sm">Share</span>
-            </button>
-
-            <button className="flex items-center space-x-2 px-4 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors">
-              <svg
-                className="w-5 h-5 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 4v16m8-8H4"
-                ></path>
-              </svg>
-              <span className="text-white text-sm">Save</span>
-            </button>
-
-            <button className="flex items-center px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors">
-              <svg
-                className="w-5 h-5 text-white"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
-                <path d="M10 4a2 2 0 100-4 2 2 0 000 4z"></path>
-                <path d="M10 20a2 2 0 100-4 2 2 0 000 4z"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Description Box */}
-        <div className="bg-gray-800 rounded-xl p-3 md:p-4">
-          <div className="flex items-center space-x-3 text-sm text-gray-300 mb-2">
-            <span className="font-medium">
-              {formatViewCount(statistics.viewCount)} views
-            </span>
-            <span>•</span>
-            <span>{formatDate(snippet.publishedAt)}</span>
-            <span>•</span>
-            <span>{formatDuration(contentDetails.duration)}</span>
-          </div>
-
-          <div
-            className={`text-white text-sm ${
-              !showDescription ? 'line-clamp-2' : ''
+          <button
+            type="button"
+            onClick={() => subscriptions.toggle(snippet.channelId)}
+            aria-pressed={isSubscribed}
+            className={`rounded-full border px-5 py-[11px] text-[13.5px] font-bold transition-colors duration-200 ${
+              isSubscribed
+                ? 'border-line-strong bg-transparent text-ink'
+                : 'border-accent bg-accent text-accent-ink'
             }`}
           >
-            <p className="whitespace-pre-wrap">{snippet.description}</p>
-          </div>
+            {isSubscribed ? 'Subscribed' : 'Subscribe'}
+          </button>
 
-          {snippet.description && snippet.description.length > 100 && (
-            <button
-              onClick={() => setShowDescription(!showDescription)}
-              className="text-gray-300 font-medium text-sm mt-2 hover:text-white transition-colors"
-            >
-              {showDescription ? 'Show less' : 'Show more'}
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button type="button" onClick={() => liked.toggle(videoId)} aria-pressed={isLiked} className={pill}>
+              <FiHeart size={14} className="text-accent-text" fill={isLiked ? 'currentColor' : 'none'} aria-hidden="true" />
+              {statistics?.likeCount ? formatCompact(statistics.likeCount) : 'Like'}
             </button>
-          )}
+            <button type="button" onClick={handleShare} className={pill}>
+              <FiShare2 size={14} className="text-accent-text" aria-hidden="true" />
+              {shareNote || 'Share'}
+            </button>
+            <button type="button" onClick={() => saved.toggle(videoId)} aria-pressed={isSaved} className={pill}>
+              <FiBookmark size={14} className="text-accent-text" fill={isSaved ? 'currentColor' : 'none'} aria-hidden="true" />
+              {isSaved ? 'Saved' : 'Save'}
+            </button>
+          </div>
         </div>
 
-        <div className="bg-gray-800 rounded-xl mt-3 p-3 md:p-4">
-          <CommentsSection videoId={v} isDarkMode={false} />
+        <div className="mt-[22px] flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted">
+          {statistics?.viewCount && (
+            <span>
+              {formatCompact(statistics.viewCount)} {isLive ? 'watching' : 'views'}
+            </span>
+          )}
+          <span aria-hidden="true">·</span>
+          <span>{formatTimeAgo(snippet.publishedAt)}</span>
+        </div>
+
+        <div className="mt-3">
+          <WatchTabs
+            keyMoments={keyMoments}
+            digest={digest}
+            notes={notes}
+            topics={topics}
+            currentTime={player.currentTime}
+            videoTitle={snippet.title}
+            onSeek={player.seekTo}
+          />
+        </div>
+
+        <div className="mt-[22px] rounded-[18px] border border-line bg-surface p-5">
+          <CommentsPanel comments={comments} />
         </div>
       </div>
-    </div>
+
+      <div className="flex min-w-0 flex-col gap-[30px]">
+        <LiveChatPanel videoId={videoId} />
+        <UpNext
+          videos={upNext}
+          autoplay={autoplay}
+          onToggleAutoplay={() => prefs.toggle('autoplay')}
+        />
+      </div>
+    </main>
   );
 };
 

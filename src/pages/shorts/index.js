@@ -1,7 +1,5 @@
-import React from 'react';
+import ShortsGrid from '@/components/ShortsGrid';
 
-const index = () => {
-  return <div>index</div>;
-};
-
-export default index;
+export default function Shorts() {
+  return <ShortsGrid />;
+}

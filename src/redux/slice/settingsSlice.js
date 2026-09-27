@@ -1,17 +1,23 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const darkModeSlice = createSlice({
+// The DOM attribute set by the _document.js pre-paint script is the source of
+// truth on first render; hydrateTheme copies it into the store on mount so the
+// two never disagree. The rail toggle goes through setTheme/toggleTheme.
+const settingsSlice = createSlice({
   name: 'theme',
-  initialState: { darkMode: false, sidebarOpen: true },
+  initialState: { theme: 'dark' },
   reducers: {
-    toggleDarkMode: (state) => {
-      state.darkMode = !state.darkMode;
+    hydrateTheme: (state, action) => {
+      state.theme = action.payload === 'light' ? 'light' : 'dark';
     },
-    toggleSidebar: (state) => {
-      state.sidebarOpen = !state.sidebarOpen;
+    setTheme: (state, action) => {
+      state.theme = action.payload === 'light' ? 'light' : 'dark';
+    },
+    toggleTheme: (state) => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
     },
   },
 });
 
-export const { toggleDarkMode, toggleSidebar } = darkModeSlice.actions;
-export default darkModeSlice.reducer;
+export const { hydrateTheme, setTheme, toggleTheme } = settingsSlice.actions;
+export default settingsSlice.reducer;

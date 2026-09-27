@@ -1,43 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
 import ButtonContainer from './ButtonContainer';
+import { FEED_CHIPS } from '@/utils/categories';
 
-const ButtonList = () => {
-  const [activeButton, setActiveButton] = useState(0);
-
-  const buttonData = [
-    'All',
-    'Music',
-    'Gaming',
-    'Movies',
-    'News',
-    'Sports',
-    'Technology',
-    'Comedy',
-    'Education',
-    'Travel',
-    'Food',
-    'Fashion',
-    'Fitness',
-    'Science',
-    'Art',
-    'Business',
-    'Health',
-    'History',
-    'Documentary',
-  ];
-
-  return (
-    <div className="flex w-full overflow-x-auto space-x-3 p-3 scrollbar-hide">
-      {buttonData.map((title, index) => (
-        <ButtonContainer
-          key={index}
-          title={title}
-          isActive={activeButton === index}
-          onClick={() => setActiveButton(index)}
-        />
-      ))}
-    </div>
-  );
-};
+// Controlled by BodyContainer so the selection actually drives the feed query
+// instead of only moving the highlight.
+const ButtonList = ({ active, onChange }) => (
+  <div
+    role="group"
+    aria-label="Filter feed by category"
+    className="no-scrollbar flex gap-2 overflow-x-auto pb-[22px]"
+  >
+    {FEED_CHIPS.map((chip) => (
+      <ButtonContainer
+        key={chip.label}
+        title={chip.label}
+        isActive={active === chip.label}
+        onClick={() => onChange(chip.label)}
+      />
+    ))}
+  </div>
+);
 
 export default ButtonList;

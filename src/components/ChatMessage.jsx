@@ -1,102 +1,54 @@
 import React from 'react';
+import { initialsFor } from '@/utils/format';
+
+const BADGES = [
+  { key: 'isOwner', label: 'Owner' },
+  { key: 'isModerator', label: 'Mod' },
+  { key: 'isSponsor', label: 'Member' },
+  { key: 'isVerified', label: 'Verified' },
+];
+
+const formatTime = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 const ChatMessage = ({ messageData }) => {
-  // Extract data from YouTube Live Chat API structure
-  //   console.log('messageData:', messageData);
-
-  const {
-    avatar,
-    username,
-    message,
-    timestamp,
-    isOwner,
-    isModerator,
-    isSponsor,
-    isVerified,
-  } = messageData;
-
-  const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  // Process emojis in message (YouTube uses :emoji-name: format)
-  const processMessage = (text) => {
-    // Convert YouTube emoji format to regular emojis or remove them
-    return text?.replace(/:([^:]+):/g, ''); // Remove emoji codes for now
-  };
+  const { avatar, username, message, timestamp } = messageData;
+  const badges = BADGES.filter((b) => messageData[b.key]);
 
   return (
-    <div className="flex items-start gap-2 p-2 hover:bg-gray-700/50 transition-colors group">
-      {/* Avatar */}
-      <div className="flex-shrink-0">
-        {avatar ? (
-          <img src={avatar} alt={username} className="w-6 h-6 rounded-full" />
-        ) : (
-          <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-            {username?.charAt(0).toUpperCase() || 'U'}
-          </div>
-        )}
-      </div>
+    <div className="group flex items-start gap-2.5 rounded-lg p-2 transition-colors hover:bg-surface2">
+      {avatar ? (
+        <img src={avatar} alt="" className="h-6 w-6 shrink-0 rounded-full" />
+      ) : (
+        <div className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface3 text-[9px] font-bold text-ink">
+          {initialsFor(username)}
+        </div>
+      )}
 
-      {/* Message Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1 mb-1">
-          {/* Username with badges */}
-          <span
-            className={`text-sm font-medium ${
-              isOwner
-                ? 'text-red-400'
-                : isModerator
-                ? 'text-green-400'
-                : isSponsor
-                ? 'text-yellow-400'
-                : 'text-blue-400'
-            }`}
-          >
-            {username}
-          </span>
-
-          {/* Owner Badge */}
-          {isOwner && (
-            <span className="bg-red-600 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-              OWNER
+      <div className="min-w-0 flex-1">
+        <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-[12.5px] font-semibold text-ink">{username}</span>
+          {badges.map((badge) => (
+            <span
+              key={badge.key}
+              className="rounded bg-accent-soft px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.1em] text-ink"
+            >
+              {badge.label}
             </span>
-          )}
-
-          {/* Moderator Badge */}
-          {isModerator && (
-            <span className="bg-green-600 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-              MOD
-            </span>
-          )}
-
-          {/* Sponsor Badge */}
-          {isSponsor && (
-            <span className="bg-yellow-600 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-              SPONSOR
-            </span>
-          )}
-
-          {/* Verified Badge */}
-          {isVerified && (
-            <span className="bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-              ✓
-            </span>
-          )}
-
-          {/* Timestamp */}
-          <span className="text-gray-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+          ))}
+          <span className="ml-auto font-mono text-[9.5px] text-muted opacity-0 transition-opacity group-hover:opacity-100">
             {formatTime(timestamp)}
           </span>
         </div>
-
-        {/* Message Text */}
-        <p className="text-sm text-white leading-relaxed break-words">
-          {processMessage(message)}
+        <p className="m-0 break-words text-[13px] leading-relaxed text-ink2">
+          {message}
         </p>
       </div>
     </div>

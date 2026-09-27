@@ -1,7 +1,55 @@
+import React, { useState } from 'react';
+import { FiHeart } from 'react-icons/fi';
 import useYouTubeComments from '@/hooks/useYouTubeComments';
-import React, { useState, useEffect } from 'react';
+import { formatCompact, formatTimeAgo, initialsFor } from '@/utils/format';
 
-const CommentsSection = ({ videoId }) => {
+const Avatar = ({ src, name, size = 36 }) =>
+  src ? (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      style={{ width: size, height: size }}
+      className="shrink-0 rounded-full"
+    />
+  ) : (
+    <div
+      style={{ width: size, height: size }}
+      className="grid shrink-0 place-items-center rounded-full bg-surface3 text-[11px] font-bold text-ink"
+    >
+      {initialsFor(name)}
+    </div>
+  );
+
+const Reply = ({ reply }) => {
+  const snippet = reply.snippet;
+  return (
+    <div className="flex gap-3">
+      <Avatar src={snippet.authorProfileImageUrl} name={snippet.authorDisplayName} size={28} />
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-ink">
+            {snippet.authorDisplayName}
+          </span>
+          <span className="font-mono text-[10px] text-muted">
+            {formatTimeAgo(snippet.publishedAt)}
+          </span>
+        </div>
+        <div
+          className="text-[13px] leading-relaxed text-ink2"
+          dangerouslySetInnerHTML={{ __html: snippet.textDisplay }}
+        />
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Presentational half. WatchPage owns the useYouTubeComments call so the same
+ * threads also feed Key moments and the Discussion digest without a second
+ * fetch; the default export below is the self-contained wrapper.
+ */
+export const CommentsPanel = ({ comments }) => {
   const {
     allComments,
     displayedComments,
@@ -17,305 +65,175 @@ const CommentsSection = ({ videoId }) => {
     handleLike,
     loadMoreComments,
     hasMoreComments,
-  } = useYouTubeComments(videoId);
+  } = comments;
 
-  const formatTimeAgo = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 1) return 'Today';
-    if (diffDays === 1) return '1 day ago';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-    return `${Math.floor(diffDays / 365)} years ago`;
-  };
-
-  const formatCount = (count) => {
-    if (!count) return '0';
-    if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
-    if (count >= 1000) return (count / 1000).toFixed(1) + 'K';
-    return count.toString();
-  };
+  const [expandedReplies, setExpandedReplies] = useState({});
 
   if (loading) {
     return (
-      <div className="text-white">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-700 rounded w-1/4 mb-4"></div>
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex space-x-3 mb-6">
-              <div className="w-10 h-10 bg-gray-700 rounded-full"></div>
-              <div className="flex-1">
-                <div className="h-4 bg-gray-700 rounded w-1/4 mb-2"></div>
-                <div className="h-4 bg-gray-700 rounded w-3/4 mb-1"></div>
-                <div className="h-4 bg-gray-700 rounded w-1/2"></div>
-              </div>
+      <div className="vt-pulse space-y-5">
+        <div className="h-4 w-32 rounded bg-surface2" />
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex gap-3">
+            <div className="h-9 w-9 rounded-full bg-surface2" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-1/4 rounded bg-surface2" />
+              <div className="h-3 w-3/4 rounded bg-surface2" />
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
     );
   }
 
+  if (error) {
+    return (
+      <p className="py-4 text-sm text-muted">
+        Comments couldn&rsquo;t be loaded. They may be turned off for this video.
+      </p>
+    );
+  }
+
   return (
-    <div className="text-white">
-      {/* Comments Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-semibold">
-          {allComments.length.toLocaleString()} Comments
-        </h3>
+    <div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-[20px] font-bold tracking-[-0.02em] text-ink">
+          {allComments.length.toLocaleString()}{' '}
+          {allComments.length === 1 ? 'Comment' : 'Comments'}
+        </h2>
 
-        {/* Sort Options */}
-        <div className="flex items-center space-x-2">
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"
-            ></path>
-          </svg>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="bg-transparent border-gray-600 text-white placeholder-gray-400 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="top" className="bg-gray-800">
-              Top comments
-            </option>
-            <option value="newest" className="bg-gray-800">
-              Newest first
-            </option>
-          </select>
+        <div className="flex items-center gap-1.5">
+          {[
+            { value: 'top', label: 'Top' },
+            { value: 'newest', label: 'Newest' },
+          ].map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setSortBy(option.value)}
+              aria-pressed={sortBy === option.value}
+              className={`rounded-[9px] px-[13px] py-[7px] text-[12.5px] font-semibold transition-colors duration-200 ${
+                sortBy === option.value
+                  ? 'bg-surface3 text-ink'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Add Comment */}
-      <div className="mb-6">
-        <div className="flex space-x-3">
-          <div className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center">
-            <span className="font-semibold">Y</span>
-          </div>
-          <div className="flex-1">
-            <textarea
-              placeholder="Add a comment..."
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              onFocus={() => setShowCommentBox(true)}
-              className="w-full bg-transparent border-gray-600 text-white placeholder-gray-400 border-b-2 border-t-0 border-l-0 border-r-0 p-2 resize-none focus:outline-none focus:border-blue-500"
-              rows={showCommentBox ? 3 : 1}
-            />
-            {showCommentBox && (
-              <div className="flex justify-end space-x-2 mt-2">
-                <button
-                  onClick={() => {
-                    setShowCommentBox(false);
-                    setNewComment('');
-                  }}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm rounded-full transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddComment}
-                  disabled={!newComment.trim()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Comment
-                </button>
-              </div>
-            )}
-          </div>
+      <div className="mb-6 flex gap-3">
+        <Avatar name="You" />
+        <div className="flex-1">
+          <textarea
+            placeholder="Add a comment…"
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            onFocus={() => setShowCommentBox(true)}
+            rows={showCommentBox ? 3 : 1}
+            aria-label="Add a comment"
+            className="w-full resize-none border-0 border-b border-line bg-transparent p-2 text-[14px] text-ink outline-none transition-colors placeholder:text-muted focus:border-accent"
+          />
+          {showCommentBox && (
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCommentBox(false);
+                  setNewComment('');
+                }}
+                className="rounded-full px-4 py-2 text-[13px] font-semibold text-muted hover:text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddComment}
+                disabled={!newComment.trim()}
+                className="rounded-full bg-accent px-4 py-2 text-[13px] font-bold text-accent-ink disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Comment
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Comments List */}
-      <div className="space-y-6">
-        {displayedComments.map((commentThread) => {
-          const comment = commentThread.snippet.topLevelComment.snippet;
-          const totalReplies = commentThread.snippet.totalReplyCount || 0;
+      <div className="space-y-5">
+        {displayedComments.map((thread) => {
+          const comment = thread.snippet.topLevelComment.snippet;
+          const replies = thread.replies?.comments || [];
+          const isOpen = expandedReplies[thread.id];
+          const isLiked = comment.viewerRating === 'like';
 
           return (
-            <div key={commentThread.id}>
-              {/* Main Comment */}
-              <div className="flex space-x-3">
-                <div className="flex-shrink-0">
-                  {comment.authorProfileImageUrl ? (
-                    <img
-                      src={comment.authorProfileImageUrl}
-                      alt={comment.authorDisplayName}
-                      className="w-10 h-10 rounded-full"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center">
-                      <span className="font-semibold">
-                        {comment.authorDisplayName.charAt(1).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-medium text-sm">
+            <div key={thread.id}>
+              <div className="flex gap-3">
+                <Avatar
+                  src={comment.authorProfileImageUrl}
+                  name={comment.authorDisplayName}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="text-[13.5px] font-semibold text-ink">
                       {comment.authorDisplayName}
                     </span>
-                    <span className="text-xs text-gray-300">
+                    <span className="font-mono text-[10.5px] text-muted">
                       {formatTimeAgo(comment.publishedAt)}
                     </span>
                   </div>
 
                   <div
-                    className="text-sm leading-relaxed mb-2 whitespace-pre-wrap"
+                    className="mb-2 whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink2"
                     dangerouslySetInnerHTML={{ __html: comment.textDisplay }}
                   />
 
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center gap-3">
                     <button
-                      onClick={() => handleLike(commentThread.id)}
-                      className="flex items-center space-x-1 bg-gray-700 hover:bg-gray-600 hover:bg-opacity-80 px-2 py-1 rounded transition-colors"
+                      type="button"
+                      onClick={() => handleLike(thread.id)}
+                      aria-pressed={isLiked}
+                      aria-label="Like comment"
+                      className="flex items-center gap-1.5 rounded-full bg-surface2 px-2.5 py-1 text-muted transition-colors hover:bg-surface3"
                     >
-                      <svg
-                        className={`w-4 h-4 ${
-                          comment.viewerRating === 'like'
-                            ? 'text-blue-500 fill-current'
-                            : ''
-                        }`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                        ></path>
-                      </svg>
-                      <span className="text-xs">
-                        {formatCount(comment.likeCount || 0)}
+                      <FiHeart
+                        size={12}
+                        className={isLiked ? 'text-accent-text' : ''}
+                        fill={isLiked ? 'currentColor' : 'none'}
+                        aria-hidden="true"
+                      />
+                      <span className="font-mono text-[10.5px]">
+                        {formatCompact(comment.likeCount || 0)}
                       </span>
                     </button>
 
-                    <button className="flex items-center space-x-1 bg-gray-700 hover:bg-gray-600 hover:bg-opacity-80 px-2 py-1 rounded transition-colors">
-                      <svg
-                        className="w-4 h-4 rotate-180"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                    {replies.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedReplies((prev) => ({
+                            ...prev,
+                            [thread.id]: !prev[thread.id],
+                          }))
+                        }
+                        aria-expanded={Boolean(isOpen)}
+                        className="text-[12px] font-semibold text-accent-text hover:underline"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.60L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                        ></path>
-                      </svg>
-                    </button>
-
-                    {comment.canRate && (
-                      <button className="text-xs font-medium text-gray-300 hover:text-white transition-colors">
-                        Reply
-                      </button>
-                    )}
-
-                    {totalReplies > 0 && (
-                      <button className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors">
-                        View {totalReplies}{' '}
-                        {totalReplies === 1 ? 'reply' : 'replies'}
+                        {isOpen ? 'Hide' : 'View'} {replies.length}{' '}
+                        {replies.length === 1 ? 'reply' : 'replies'}
                       </button>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Replies Section - if replies exist */}
-              {commentThread.replies && commentThread.replies.comments && (
-                <div className="ml-12 mt-4 pl-4 border-l-2 border-gray-700 space-y-4">
-                  {commentThread.replies.comments.map((reply) => {
-                    const replySnippet = reply.snippet;
-                    return (
-                      <div
-                        key={reply.id}
-                        className="p-3 rounded-lg bg-gray-700"
-                      >
-                        <div className="flex space-x-3">
-                          <div className="flex-shrink-0">
-                            {replySnippet.authorProfileImageUrl ? (
-                              <img
-                                src={replySnippet.authorProfileImageUrl}
-                                alt={replySnippet.authorDisplayName}
-                                className="w-8 h-8 rounded-full"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center">
-                                <span className="text-xs font-semibold">
-                                  {replySnippet.authorDisplayName
-                                    .charAt(1)
-                                    .toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="font-medium text-sm">
-                                {replySnippet.authorDisplayName}
-                              </span>
-                              <span className="text-xs text-gray-300">
-                                {formatTimeAgo(replySnippet.publishedAt)}
-                              </span>
-                            </div>
-
-                            <div
-                              className="text-sm leading-relaxed mb-2"
-                              dangerouslySetInnerHTML={{
-                                __html: replySnippet.textDisplay,
-                              }}
-                            />
-
-                            <div className="flex items-center space-x-4">
-                              <button className="flex items-center space-x-1 bg-gray-700 hover:bg-gray-600 hover:bg-opacity-80 px-2 py-1 rounded transition-colors">
-                                <svg
-                                  className={`w-3 h-3 ${
-                                    replySnippet.viewerRating === 'like'
-                                      ? 'text-blue-500 fill-current'
-                                      : ''
-                                  }`}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.60L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
-                                  ></path>
-                                </svg>
-                                <span className="text-xs">
-                                  {formatCount(replySnippet.likeCount || 0)}
-                                </span>
-                              </button>
-
-                              <button className="text-xs font-medium text-gray-300 hover:text-white transition-colors">
-                                Reply
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+              {isOpen && replies.length > 0 && (
+                <div className="ml-12 mt-4 space-y-4 border-l border-line pl-4">
+                  {replies.map((reply) => (
+                    <Reply key={reply.id} reply={reply} />
+                  ))}
                 </div>
               )}
             </div>
@@ -323,20 +241,23 @@ const CommentsSection = ({ videoId }) => {
         })}
       </div>
 
-      {/* Load More Comments */}
       {hasMoreComments && (
-        <div className="mt-8 text-center">
+        <div className="mt-6 text-center">
           <button
+            type="button"
             onClick={loadMoreComments}
-            className="px-6 py-2 bg-gray-700 hover:bg-gray-600 rounded-full hover:bg-opacity-80 transition-colors"
+            className="rounded-full border border-line px-5 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:border-accent hover:text-accent-text"
           >
-            Show more comments ({allComments.length - displayedComments.length}{' '}
-            remaining)
+            Show more comments
           </button>
         </div>
       )}
     </div>
   );
 };
+
+const CommentsSection = ({ videoId }) => (
+  <CommentsPanel comments={useYouTubeComments(videoId)} />
+);
 
 export default CommentsSection;

@@ -1,22 +1,18 @@
 import React from 'react';
 
-const ButtonContainer = ({ title, isActive, onClick }) => {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-    px-3 py-1 rounded-lg font-medium text-sm whitespace-nowrap
-    transition-all duration-200 hover:shadow-md
-    ${
+const ButtonContainer = ({ title, isActive, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={isActive}
+    className={`shrink-0 whitespace-nowrap rounded-full border px-[15px] py-2 text-[13px] font-semibold transition-colors duration-200 ${
       isActive
-        ? 'bg-red text-active-text'
-        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-    }
-  `}
-    >
-      {title}
-    </button>
-  );
-};
+        ? 'border-accent bg-accent text-accent-ink'
+        : 'border-transparent bg-surface2 text-ink2 hover:bg-surface3'
+    }`}
+  >
+    {title}
+  </button>
+);
 
 export default ButtonContainer;

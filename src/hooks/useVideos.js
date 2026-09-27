@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addVideos } from '@/redux/slice/videoListSlice';
 
-export default function useVideos(cleared) {
+/**
+ * Home feed. `query` comes from the active category chip — null means the
+ * default popular chart, anything else is a filtered search.
+ */
+export default function useVideos(query = null) {
   const dispatch = useDispatch();
-  const { videos, searchResults } = useSelector((state) => state.videoList);
+  const { videos, cleared } = useSelector((state) => state.videoList);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,13 +16,14 @@ export default function useVideos(cleared) {
   const getVideos = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/viewtube');
+      const url = query ? `/api/feed?q=${encodeURIComponent(query)}` : '/api/feed';
+      const res = await fetch(url);
 
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Couldn't reach the video service (${res.status})`);
 
       const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
       dispatch(addVideos(data.items || []));
       setError(null);
     } catch (err) {
@@ -27,17 +32,15 @@ export default function useVideos(cleared) {
     } finally {
       setLoading(false);
     }
-  }, [dispatch]);
+  }, [dispatch, query]);
 
   useEffect(() => {
     getVideos();
   }, [getVideos]);
 
   useEffect(() => {
-    if (cleared) {
-      getVideos();
-    }
+    if (cleared) getVideos();
   }, [cleared, getVideos]);
 
-  return { videos, searchResults, loading, error, refetch: getVideos };
+  return { videos, loading, error, refetch: getVideos };
 }

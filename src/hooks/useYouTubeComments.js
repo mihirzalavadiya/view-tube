@@ -1,109 +1,117 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export default function useYouTubeComments(videoId, commentsPerPage = 5) {
+const PER_PAGE = 5;
+
+const topLevel = (thread) => thread?.snippet?.topLevelComment?.snippet || {};
+
+export default function useYouTubeComments(videoId, commentsPerPage = PER_PAGE) {
   const [allComments, setAllComments] = useState([]);
-  const [displayedComments, setDisplayedComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newComment, setNewComment] = useState('');
-  const [sortBy, setSortBy] = useState('top'); // 'top' | 'newest'
+  const [sortBy, setSortBy] = useState('top');
   const [showCommentBox, setShowCommentBox] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [visible, setVisible] = useState(commentsPerPage);
 
   useEffect(() => {
-    if (!videoId) return;
+    if (!videoId) return undefined;
 
+    let cancelled = false;
     setLoading(true);
+    setError(null);
+    setVisible(commentsPerPage);
+
     fetch(`/api/comments?videoId=${videoId}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.items) {
-          setAllComments(data.items);
-          setDisplayedComments(data.items.slice(0, commentsPerPage));
-          setCurrentPage(1);
-        }
+        if (cancelled) return;
+        if (data.error) throw new Error(data.error);
+        setAllComments(data.items || []);
         setLoading(false);
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error('Error fetching comments:', err);
         setError(err.message);
         setLoading(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [videoId, commentsPerPage]);
 
-  // Load more
-  const loadMoreComments = () => {
-    const nextPage = currentPage + 1;
-    const startIndex = currentPage * commentsPerPage;
-    const endIndex = startIndex + commentsPerPage;
-    const moreComments = allComments.slice(startIndex, endIndex);
+  // Previously sortBy was stored but never applied, so the dropdown changed
+  // its own label and nothing else.
+  const sorted = useMemo(() => {
+    const copy = [...allComments];
+    if (sortBy === 'newest') {
+      return copy.sort(
+        (a, b) => new Date(topLevel(b).publishedAt || 0) - new Date(topLevel(a).publishedAt || 0)
+      );
+    }
+    return copy.sort((a, b) => (topLevel(b).likeCount || 0) - (topLevel(a).likeCount || 0));
+  }, [allComments, sortBy]);
 
-    setDisplayedComments((prev) => [...prev, ...moreComments]);
-    setCurrentPage(nextPage);
-  };
+  const displayedComments = useMemo(() => sorted.slice(0, visible), [sorted, visible]);
 
-  // Add new comment (local only)
-  const handleAddComment = () => {
-    if (newComment.trim()) {
-      const newCommentThread = {
-        id: `temp_${Date.now()}`,
+  const loadMoreComments = useCallback(
+    () => setVisible((v) => v + commentsPerPage),
+    [commentsPerPage]
+  );
+
+  // Local-only: posting to YouTube needs OAuth, which this app doesn't have.
+  const handleAddComment = useCallback(() => {
+    const text = newComment.trim();
+    if (!text) return;
+
+    setAllComments((prev) => [
+      {
+        id: `local_${Date.now()}`,
         snippet: {
           topLevelComment: {
             snippet: {
               authorDisplayName: 'You',
               authorProfileImageUrl: null,
-              textDisplay: newComment,
-              textOriginal: newComment,
+              textDisplay: text,
               publishedAt: new Date().toISOString(),
               likeCount: 0,
               viewerRating: 'none',
-              canRate: true,
             },
           },
-          canReply: true,
           totalReplyCount: 0,
-          isPublic: true,
         },
-      };
-      setDisplayedComments([newCommentThread, ...displayedComments]);
-      setAllComments([newCommentThread, ...allComments]);
-      setNewComment('');
-      setShowCommentBox(false);
-    }
-  };
+      },
+      ...prev,
+    ]);
+    setNewComment('');
+    setShowCommentBox(false);
+    setVisible((v) => v + 1);
+  }, [newComment]);
 
-  // Like/Unlike
-  const handleLike = (commentId, isReply = false) => {
-    const updateLikes = (comments) =>
-      comments.map((commentThread) => {
-        if (!isReply && commentThread.id === commentId) {
-          const top = commentThread.snippet.topLevelComment.snippet;
-          const currentLikeCount = top.likeCount || 0;
-          const isLiked = top.viewerRating === 'like';
-
-          return {
-            ...commentThread,
-            snippet: {
-              ...commentThread.snippet,
-              topLevelComment: {
-                ...commentThread.snippet.topLevelComment,
-                snippet: {
-                  ...top,
-                  viewerRating: isLiked ? 'none' : 'like',
-                  likeCount: isLiked
-                    ? currentLikeCount - 1
-                    : currentLikeCount + 1,
-                },
+  const handleLike = useCallback((commentId) => {
+    setAllComments((prev) =>
+      prev.map((thread) => {
+        if (thread.id !== commentId) return thread;
+        const snippet = topLevel(thread);
+        const isLiked = snippet.viewerRating === 'like';
+        return {
+          ...thread,
+          snippet: {
+            ...thread.snippet,
+            topLevelComment: {
+              ...thread.snippet.topLevelComment,
+              snippet: {
+                ...snippet,
+                viewerRating: isLiked ? 'none' : 'like',
+                likeCount: Math.max(0, (snippet.likeCount || 0) + (isLiked ? -1 : 1)),
               },
             },
-          };
-        }
-        return commentThread;
-      });
-
-    setDisplayedComments(updateLikes);
-    setAllComments(updateLikes);
-  };
+          },
+        };
+      })
+    );
+  }, []);
 
   return {
     allComments,
@@ -119,6 +127,6 @@ export default function useYouTubeComments(videoId, commentsPerPage = 5) {
     handleAddComment,
     handleLike,
     loadMoreComments,
-    hasMoreComments: displayedComments.length < allComments.length,
+    hasMoreComments: displayedComments.length < sorted.length,
   };
 }
